@@ -5,7 +5,7 @@ on:
       - main
     paths:
       - .github/workflows/deploy.yaml
-      - *.ts
+      - '*.ts'
 
 jobs:
   deploy:
