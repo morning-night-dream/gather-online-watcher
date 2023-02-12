@@ -1,9 +1,11 @@
 import { CreateGatherClient } from "./gather.ts";
-import { CreateMemberRepository, initMembers } from "./member.ts";
+import { CreateMemberRepository, initMembers, Member } from "./member.ts";
 import { SlackAPI } from "https://deno.land/x/deno_slack_api@0.0.8/mod.ts";
 import Logger from "https://deno.land/x/logger@v1.0.2/logger.ts";
+import { randomNumber } from "https://deno.land/x/random_number@2.0.0/mod.ts";
 import { getConfig } from "./config.ts";
 import { CreateSlackRepository } from "./slack.ts";
+import { postgresClient } from "./postgres.ts";
 
 const logger = new Logger();
 
@@ -16,23 +18,44 @@ const gatherClient = await CreateGatherClient(
 
 const members = await initMembers();
 
-const memberRepository = CreateMemberRepository(members);
+const memberRepository = CreateMemberRepository(members, postgresClient);
 
 const slackClient = SlackAPI(config.slack.API_TOKEN);
 
 const slackRepository = CreateSlackRepository(slackClient);
 
-const response = await slackRepository.listEmoji();
-console.log(`resposen is ${response}`);
+const emojis = await slackRepository.listEmoji();
+
+const unusedEmojis = emojis.filter((v) => {
+  !members.map((v) => v.icon).includes(v)
+});
 
 // @ts-ignore
 gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
+  if (!context.playerId) {
+    return;
+  }
+
   const playerId = context.playerId;
-  const member = memberRepository.findByGatherId(playerId as string);
+  let member = memberRepository.findByGatherId(playerId);
 
   if (!member) {
-    logger.info(`Unregistered gatherId ${playerId}`);
-    return;
+    const gatherPlayer = await gatherClient.getPlayer(context.playerId!);
+    
+    const emojiIndex = randomNumber({ min: 0, max: unusedEmojis.length -1 })
+
+    const newMember : Member = {
+      name: gatherPlayer.name,
+      gatherId: playerId,
+      icon: unusedEmojis[emojiIndex],
+      isOnline: false,
+    };
+
+    unusedEmojis.splice(emojiIndex, 1);
+    
+    memberRepository.createMember(newMember);
+
+    member = newMember;
   }
 
   if (member.isOnline) {
@@ -51,10 +74,15 @@ gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
 });
 
 gatherClient.subscribeToEvent("playerExits", async (_data, context) => {
+  if (!context.playerId) {
+    return;
+  }
+
   const playerId = context.playerId;
   const member = memberRepository.findByGatherId(playerId as string);
   if (!member) {
-    logger.info(`Unregistered gatherId ${playerId}`);
+    logger.info(`unknown player ${playerId} left`)
+
     return;
   }
 

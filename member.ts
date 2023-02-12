@@ -1,3 +1,4 @@
+import { Client } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { postgresClient } from "./postgres.ts";
 
 export interface Member {
@@ -27,10 +28,12 @@ export const initMembers = async (): Promise<Member[]> => {
 interface MemberRepository {
   findByGatherId: (gatherId: string) => Member | undefined;
   updateStatusByGatherId: (gatherId: string, isOnline: boolean) => void;
+  createMember: (member: Member) => void;
 }
 
 export class MemberRepositoryImpl implements MemberRepository {
   members: Member[];
+  postgresClient: Client;
 
   findByGatherId = (gatherId: string): Member | undefined => {
     return this.members.find((v) => v.gatherId === gatherId);
@@ -44,11 +47,22 @@ export class MemberRepositoryImpl implements MemberRepository {
     });
   };
 
-  constructor(members: Member[]) {
+  createMember = (member: Member) => {
+    this.postgresClient.queryObject(
+      `INSERT INTO members(name, gather_id, icon) VALUES('${member.name}','${member.gatherId}','${member.icon}')`,
+    );
+    this.members.push(member);
+  };
+
+  constructor(members: Member[], postgresClient: Client) {
     this.members = members;
+    this.postgresClient = postgresClient;
   }
 }
 
-export const CreateMemberRepository = (members: Member[]): MemberRepository => {
-  return new MemberRepositoryImpl(members);
+export const CreateMemberRepository = (
+  members: Member[],
+  postgresClient: Client,
+): MemberRepository => {
+  return new MemberRepositoryImpl(members, postgresClient);
 };
