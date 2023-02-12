@@ -1,3 +1,4 @@
+import { Lock } from "https://deno.land/x/async/mod.ts";
 import { CreateGatherClient } from "./gather.ts";
 import { CreateMemberRepository, initMembers, Member } from "./member.ts";
 import { SlackAPI } from "https://deno.land/x/deno_slack_api@0.0.8/mod.ts";
@@ -8,6 +9,8 @@ import { CreateSlackRepository } from "./slack.ts";
 import { postgresClient } from "./postgres.ts";
 
 const logger = new Logger();
+
+const lock = new Lock();
 
 const config = getConfig();
 
@@ -27,76 +30,80 @@ const slackRepository = CreateSlackRepository(slackClient);
 const emojis = await slackRepository.listEmoji();
 
 const unusedEmojis = emojis.filter((v) => {
-  !members.map((v) => v.icon).includes(v)
+  !members.map((v) => v.icon).includes(v);
 });
 
 // @ts-ignore
 gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
-  if (!context.playerId) {
-    return;
-  }
+  await lock.with(async () => {
+    if (!context.playerId) {
+      return;
+    }
 
-  const playerId = context.playerId;
-  let member = memberRepository.findByGatherId(playerId);
+    const playerId = context.playerId;
+    let member = memberRepository.findByGatherId(playerId);
 
-  if (!member) {
-    const gatherPlayer = await gatherClient.getPlayer(context.playerId!);
-    
-    const emojiIndex = randomNumber({ min: 0, max: unusedEmojis.length -1 })
+    if (!member) {
+      const gatherPlayer = await gatherClient.getPlayer(context.playerId!);
 
-    const newMember : Member = {
-      name: gatherPlayer.name,
-      gatherId: playerId,
-      icon: unusedEmojis[emojiIndex],
-      isOnline: false,
-    };
+      const emojiIndex = randomNumber({ min: 0, max: unusedEmojis.length - 1 });
 
-    unusedEmojis.splice(emojiIndex, 1);
-    
-    memberRepository.createMember(newMember);
+      const newMember: Member = {
+        name: gatherPlayer.name,
+        gatherId: playerId,
+        icon: unusedEmojis[emojiIndex],
+        isOnline: false,
+      };
 
-    member = newMember;
-  }
+      unusedEmojis.splice(emojiIndex, 1);
 
-  if (member.isOnline) {
-    logger.info(`member ${member.name} is already online`);
-    return;
-  }
+      memberRepository.createMember(newMember);
 
-  logger.info(`${member.name} join`);
-  memberRepository.updateStatusByGatherId(member.gatherId, true);
+      member = newMember;
+    }
 
-  await slackRepository.addReaction(
-    config.slack.CHANNEL_ID,
-    member.icon,
-    config.slack.SLACK_MESSAGE_TIMESTAMP,
-  );
+    if (member.isOnline) {
+      logger.info(`member ${member.name} is already online`);
+      return;
+    }
+
+    logger.info(`${member.name} join`);
+    memberRepository.updateStatusByGatherId(member.gatherId, true);
+
+    await slackRepository.addReaction(
+      config.slack.CHANNEL_ID,
+      member.icon,
+      config.slack.SLACK_MESSAGE_TIMESTAMP,
+    );
+  });
 });
 
 gatherClient.subscribeToEvent("playerExits", async (_data, context) => {
-  if (!context.playerId) {
-    return;
-  }
+  await lock.with(async () => {
+    if (!context.playerId) {
+      return;
+    }
 
-  const playerId = context.playerId;
-  const member = memberRepository.findByGatherId(playerId as string);
-  if (!member) {
-    logger.info(`unknown player ${playerId} left`)
+    const playerId = context.playerId;
+    const member = memberRepository.findByGatherId(playerId as string);
+    if (!member) {
+      logger.info(`unknown player ${playerId} left`);
 
-    return;
-  }
+      return;
+    }
 
-  if (!member.isOnline) {
-    logger.info(`member ${member.gatherId} is already offline`);
-    return;
-  }
+    if (!member.isOnline) {
+      logger.info(`member ${member.gatherId} is already offline`);
+      return;
+    }
 
-  logger.info(`${member.name} exit`);
-  memberRepository.updateStatusByGatherId(member.gatherId, false);
+    logger.info(`${member.name} exit`);
+    memberRepository.updateStatusByGatherId(member.gatherId, false);
 
-  await slackRepository.removeReaction(
-    config.slack.CHANNEL_ID,
-    member.icon,
-    config.slack.SLACK_MESSAGE_TIMESTAMP,
-  );
+    await slackRepository.removeReaction(
+      config.slack.CHANNEL_ID,
+      member.icon,
+      config.slack.SLACK_MESSAGE_TIMESTAMP,
+    );
+  });
 });
