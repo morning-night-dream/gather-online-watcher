@@ -1,0 +1,26 @@
+name: Deploy
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/deploy.yaml
+      - *.ts
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v3
+
+      - name: Upload to Deno Deploy
+        uses: denoland/deployctl@v1
+        with:
+          project: "gather-online-watcher"
+          entrypoint: "./index.ts"
