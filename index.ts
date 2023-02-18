@@ -27,12 +27,6 @@ const slackClient = SlackAPI(config.slack.API_TOKEN);
 
 const slackRepository = CreateSlackRepository(slackClient);
 
-const emojis = await slackRepository.listEmoji();
-
-const unusedEmojis = emojis.filter((v) => {
-  !members.map((v) => v.icon).includes(v);
-});
-
 // @ts-ignore
 gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
   await lock.with(async () => {
@@ -44,22 +38,9 @@ gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
     let member = memberRepository.findByGatherId(playerId);
 
     if (!member) {
-      const gatherPlayer = await gatherClient.getPlayer(context.playerId!);
-
-      const emojiIndex = randomNumber({ min: 0, max: unusedEmojis.length - 1 });
-
-      const newMember: Member = {
-        name: gatherPlayer.name,
-        gatherId: playerId,
-        icon: unusedEmojis[emojiIndex],
-        isOnline: false,
-      };
-
-      unusedEmojis.splice(emojiIndex, 1);
-
-      memberRepository.createMember(newMember);
-
-      member = newMember;
+      logger.info(`unknown ${playerId} is join`);
+      
+      return;
     }
 
     if (member.isOnline) {
@@ -78,6 +59,7 @@ gatherClient.subscribeToEvent("playerJoins", async (_data, context) => {
   });
 });
 
+// @ts-ignore
 gatherClient.subscribeToEvent("playerExits", async (_data, context) => {
   await lock.with(async () => {
     if (!context.playerId) {
