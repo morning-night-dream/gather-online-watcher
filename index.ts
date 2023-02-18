@@ -1,9 +1,8 @@
 import { Lock } from "https://deno.land/x/async/mod.ts";
 import { CreateGatherClient } from "./gather.ts";
-import { CreateMemberRepository, initMembers, Member } from "./member.ts";
+import { CreateMemberRepository, initMembers } from "./member.ts";
 import { SlackAPI } from "https://deno.land/x/deno_slack_api@0.0.8/mod.ts";
 import Logger from "https://deno.land/x/logger@v1.0.2/logger.ts";
-import { randomNumber } from "https://deno.land/x/random_number@2.0.0/mod.ts";
 import { getConfig } from "./config.ts";
 import { CreateSlackRepository } from "./slack.ts";
 import { postgresClient } from "./postgres.ts";
