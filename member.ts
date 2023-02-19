@@ -28,7 +28,6 @@ export const initMembers = async (): Promise<Member[]> => {
 interface MemberRepository {
   findByGatherId: (gatherId: string) => Member | undefined;
   updateStatusByGatherId: (gatherId: string, isOnline: boolean) => void;
-  createMember: (member: Member) => void;
 }
 
 export class MemberRepositoryImpl implements MemberRepository {
@@ -45,13 +44,6 @@ export class MemberRepositoryImpl implements MemberRepository {
         v.isOnline = isOnline;
       }
     });
-  };
-
-  createMember = (member: Member) => {
-    this.postgresClient.queryObject(
-      `INSERT INTO members(name, gather_id, icon) VALUES('${member.name}','${member.gatherId}','${member.icon}')`,
-    );
-    this.members.push(member);
   };
 
   constructor(members: Member[], postgresClient: Client) {

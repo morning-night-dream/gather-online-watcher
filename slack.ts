@@ -11,7 +11,6 @@ interface SlackRepository {
     emoji: string,
     messageTimestamp: string,
   ) => void;
-  listEmoji: () => Promise<string[]>;
 }
 
 export class SlackRepositoryImpl implements SlackRepository {
@@ -40,11 +39,6 @@ export class SlackRepositoryImpl implements SlackRepository {
       "timestamp": messageTimestamp,
     });
   };
-
-  async listEmoji() {
-    const response = await this.slackClient.emoji.list({});
-    return Object.keys(response.emoji).map((key) => key);
-  }
 
   constructor(slackAPIClient: ReturnType<typeof SlackAPI>) {
     this.slackClient = slackAPIClient;
