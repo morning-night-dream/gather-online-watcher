@@ -1,7 +1,7 @@
 NESSIE_VERSION=2.0.10
 
 run:
-	@deno run --allow-all index.ts
+	@deno run --allow-all src/index.ts
 
 fmt:
 	@deno fmt
